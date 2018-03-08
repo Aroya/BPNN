@@ -1,7 +1,7 @@
 #include"BPNN2.h"
 
 static short printCount = 1;
-static short printMax = 1000;
+static short printMax = 10000;
 static int allCnt = 1;
 static stringstream sst;
 static string outputFileName;
@@ -9,6 +9,8 @@ static string sstOut;
 static string sstOut2;
 double defaultActive(const double&t) { return t; }
 double defaultActiveD(const double&t) { return 1.0; }
+template<class T>
+T sign(const T&);
 double BPNN::dynamic() {
 	//单层
 	//return 0.001;
@@ -21,13 +23,14 @@ double BPNN::dynamic() {
 	//return 0.00001;
 	//4隐藏层
 	//最终结果使用静态
-	return 1;
+	return 0.1;
 }
 
 BPNN::BPNN(const int&CountOfLayers) {
 	layers = CountOfLayers;
 	layerNodes = new int[CountOfLayers];
 	regularization = none;
+	regularizationFactor = 0.01;
 }
 
 void BPNN::setInputNodes(const int&Nodes) {
@@ -54,8 +57,10 @@ void BPNN::setInputData(double* NodeDataArray, double(*active)(const double&)) {
 }
 //set layer array size(not contain input)
 void BPNN::setLayerNodes(int* Nodes) {
-	int i, j, k;
+	int i, j, k, sum;
+	sum = 0;
 	for (i = 1, j = 0; i < layers; i++, j++) {
+		//sum += Nodes[j];
 		k = Nodes[j];
 		layerNodes[i] = k;
 
@@ -95,6 +100,7 @@ void BPNN::setLayerNodes(int* Nodes) {
 		fixW[i].resize(k, layerNodes[j]);
 		fixW[i].setZero();
 	}
+	//regularizationFactor = 1 / double(sum);
 }
 //Get Ans
 void BPNN::updateLayers(double(*active)(const double&)) {
@@ -178,8 +184,8 @@ void BPNN::setExpectData(double*Data, double(*active)(const double&)) {
 void BPNN::learn(const int&groups) {
 	int i;
 	for (i = layers - 1; i > 0; i--) {
-		Bias[i] = Bias[i] + dynamic()*fixBias[i] / groups;
-		W[i] = W[i] + dynamic()*fixW[i] / groups;
+		Bias[i] = Bias[i] + dynamic()*(fixBias[i] - derivateRegularization(Bias[i]))/ groups;
+		W[i] = W[i] + dynamic()*(fixW[i] - derivateRegularization(W[i])) / groups;
 	}
 }
 void BPNN::clearFix() {
@@ -307,13 +313,46 @@ double BPNN::computeRegularization() {
 		for (auto i : W) {
 			sum += i.lpNorm<1>();
 		}
-		return sum;
+		return sum*regularizationFactor;
 	case L2:
 		for (auto i : W) {
 			//sum += i.squaredNorm();
 			sum += i.lpNorm<2>();
 		}
-		return sum / 2;
+		return sum / 2 * regularizationFactor;
 	}
 	return 0;
+}
+MatrixXd BPNN::derivateRegularization(const MatrixXd&t) {
+	//cout << "t" << endl;
+	//cout << t << endl;
+	MatrixXd p = t;
+	//cout << "p" << endl;
+	//cout << p << endl;
+	//cout << p.rows() << "\t" << p.cols() << endl;
+	switch(regularization) {
+	case L1:
+		for (int i = 0; i < p.rows();i++) {
+			for (int j = 0; j < p.cols(); j++) {
+				p(i, j) = sign(p(i, j));
+			}
+		}
+		p *= regularizationFactor / 2;
+		break;
+	case L2:
+		p *= regularizationFactor;
+		break;
+	default:
+		p.setZero();
+	}
+	//cout << "p" << endl;
+	//cout << p << endl;
+	//cout << "\n\n";
+	return p;
+}
+
+template<class T>
+T sign(const T&t) {
+	if (t < 0)return -1;
+	return 1;
 }

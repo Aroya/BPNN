@@ -45,12 +45,16 @@ int main() {
 	double(*激活函数)(const double&) = 线性, double(*激活函数求导)(const double&) = 线性求导,
 	int writeFileTest = 不写文件只训练);
 	*/
-	for (int i = 0; i < 9999; i++) {
-		bpnn.runGroup(db, fdb, dr, softmax, softmaxD);
+	for (int i = 0; i < 999999; i++) {
+		bpnn.runGroup(db, fdb, dr, sigmoid, sigmoidD);
+		//if (i % 100000 == 0) {
+		//	bpnn.printW();
+		//	system("pause");
+		//}
 	}
 #ifndef Test//如果没有ifndef将会在迭代完成后再输出文件
 	bpnn.printW();
-	bpnn.runGroup(tdb, nullptr, tdr, softmax, softmaxD, 0);
+	bpnn.runGroup(tdb, nullptr, tdr, sigmoid, sigmoidD, 0);
 
 #endif // !Test Output after all iteration
 	system("pause");

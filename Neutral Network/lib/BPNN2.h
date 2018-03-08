@@ -70,11 +70,14 @@ private:
 
 	//正则化设置
 	Regularization regularization;
+	double regularizationFactor;//由W的size决定
 
 	double loss;
 	double dynamic();
 	void learn(const int&groups);
 	void clearFix();
+
 	double computeRegularization();
+	MatrixXd derivateRegularization(const MatrixXd&);
 };
 #endif

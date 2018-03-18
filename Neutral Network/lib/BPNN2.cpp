@@ -31,6 +31,18 @@ BPNN::BPNN(const int&CountOfLayers) {
 	layerNodes = new int[CountOfLayers];
 	regularization = none;
 	regularizationFactor = 0.01;
+	//初始激活函数
+	activeFunction = defaultActive;
+	activeFunctionD = defaultActiveD;
+	//初始空间
+	trainingSet = nullptr;
+	trainingFlag = nullptr;
+	trainingCount = 0;
+	validationSet = nullptr;
+	validationFlag = nullptr;
+	validationCount = 0;
+	testSet = nullptr;
+	testCount = 0;
 }
 
 void BPNN::setInputNodes(const int&Nodes) {
@@ -293,6 +305,32 @@ void BPNN::runGroup(double**group, double**flag, const int&groups,
 	system("pause");
 #endif // ShowAllNodes
 	allCnt++;
+}
+
+void BPNN::setActiveFunction(double(*a)(const double&), double(*aD)(const double&)) {
+	activeFunction = a;
+	activeFunctionD = aD;
+}
+
+void BPNN::setTrainingSet(double ** set, double ** flag, const int & count) {
+	trainingSet = set;
+	trainingFlag = flag;
+	trainingCount = count;
+}
+
+void BPNN::setValidationSet(double ** set, double ** flag, const int & count) {
+	validationSet = set;
+	validationFlag = flag;
+	validationCount = count;
+}
+
+void BPNN::setTestSet(double ** set, const int & count) {
+	testSet = set;
+	testCount = count;
+}
+
+void BPNN::train(const int & times) {
+	//to do
 }
 
 void BPNN::printW() {

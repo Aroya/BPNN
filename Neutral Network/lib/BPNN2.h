@@ -38,6 +38,18 @@ public:
 	void runGroup(double**groupData, double**flag, const int&groups,
 		double(*)(const double&) = defaultActive, double(*)(const double&) = defaultActiveD,
 		int writeFileTest = 1);
+
+	//设置激活函数
+	void setActiveFunction(double(*active)(const double&), double(*activeD)(const double&));
+	//输入训练集
+	void setTrainingSet(double**set, double**flag, const int&count);
+	//输入验证集
+	void setValidationSet(double**set, double**flag, const int&count);
+	//输入测试集
+	void setTestSet(double**set, const int&count);
+	//训练,无验证集自动使用训练集
+	void train(const int&times);
+
 	//正则化测试
 	void printW();
 	//正则化设置
@@ -67,6 +79,22 @@ private:
 	VectorXd emptyVector;
 	int layers;
 	int *layerNodes;
+
+	//激活函数指针
+	double (*activeFunction)(const double&);
+	double(*activeFunctionD)(const double&);
+
+	//训练集
+	double**trainingSet;
+	double**trainingFlag;
+	int trainingCount;
+	//验证集
+	double**validationSet;
+	double**validationFlag;
+	int validationCount;
+	//测试集
+	double**testSet;
+	int testCount;
 
 	//正则化设置
 	Regularization regularization;

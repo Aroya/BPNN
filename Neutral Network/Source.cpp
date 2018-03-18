@@ -26,36 +26,17 @@ int main() {
 	//初始化BPNN总层数
 	BPNN bpnn(layers);
 	//设置正则化
-	bpnn.setRegularization(L1);
+	bpnn.setRegularization(none);
+	//设置earlystopping
+	bpnn.setEarlyStoppiing(true,100);
 	//设置输入节点数
 	bpnn.setInputNodes(trainSet.getColumns());
 	//设置输入层之后的每层节点数
 	bpnn.setLayerNodes(l);
 	//使用helper接口获取bpnn需要的数据结构
-	double **db = trainSet.getDataPointer();
-	double **fdb = trainFlag.getDataPointer();
-	int dr = trainSet.getRows();
+	bpnn.setTrainingSet(trainSet.getDataPointer(), trainFlag.getDataPointer(), trainSet.getRows());
+	bpnn.setActiveFunction(sigmoid, sigmoidD);
+	bpnn.train(100000);
 
-
-	double **tdb = fdb;
-	int tdr = dr;
-	
-	/*runGroup参数
-	void runGroup(double**数据矩阵(数据包), double**期望的输出(CNT数据), const int&数据组数,
-	double(*激活函数)(const double&) = 线性, double(*激活函数求导)(const double&) = 线性求导,
-	int writeFileTest = 不写文件只训练);
-	*/
-	for (int i = 0; i < 999999; i++) {
-		bpnn.runGroup(db, fdb, dr, sigmoid, sigmoidD);
-		//if (i % 100000 == 0) {
-		//	bpnn.printW();
-		//	system("pause");
-		//}
-	}
-#ifndef Test//如果没有ifndef将会在迭代完成后再输出文件
-	bpnn.printW();
-	bpnn.runGroup(tdb, nullptr, tdr, sigmoid, sigmoidD, 0);
-
-#endif // !Test Output after all iteration
 	system("pause");
 }

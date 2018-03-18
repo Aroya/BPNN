@@ -11,6 +11,14 @@ double defaultActive(const double&t) { return t; }
 double defaultActiveD(const double&t) { return 1.0; }
 template<class T>
 T sign(const T&);
+void BPNN::setEarlyStoppiing(const bool &t, const int&p) {
+	patient_earlyStopping = p;
+	earlyStopping = t;
+}
+void BPNN::setPatient_EarlyStopping(const int &t)
+{
+	patient_earlyStopping = t;
+}
 double BPNN::dynamic() {
 	//单层
 	//return 0.001;
@@ -29,8 +37,7 @@ double BPNN::dynamic() {
 BPNN::BPNN(const int&CountOfLayers) {
 	layers = CountOfLayers;
 	layerNodes = new int[CountOfLayers];
-	regularization = none;
-	regularizationFactor = 0.01;
+
 	//初始激活函数
 	activeFunction = defaultActive;
 	activeFunctionD = defaultActiveD;
@@ -38,11 +45,20 @@ BPNN::BPNN(const int&CountOfLayers) {
 	trainingSet = nullptr;
 	trainingFlag = nullptr;
 	trainingCount = 0;
+	validation = false;
 	validationSet = nullptr;
 	validationFlag = nullptr;
 	validationCount = 0;
+	test = false;
 	testSet = nullptr;
 	testCount = 0;
+	//正则化
+	regularization = none;
+	regularizationFactor = 0.01;
+	//正则化-提前终止
+	earlyStopping = false;
+	patient_earlyStopping = 10;
+	worse_earlyStopping = 0;
 }
 
 void BPNN::setInputNodes(const int&Nodes) {
@@ -61,7 +77,7 @@ void BPNN::setInputNodes(const int&Nodes) {
 	fixW.push_back(emptyMatrix);
 }
 //copy input data to first index of private data
-void BPNN::setInputData(double* NodeDataArray, double(*active)(const double&)) {
+void BPNN::setInputData(double* NodeDataArray) {
 	int i, j = layerNodes[0];
 	for (i = 0; i < j; i++) {
 		X[0](i) = NodeDataArray[i];
@@ -115,7 +131,7 @@ void BPNN::setLayerNodes(int* Nodes) {
 	//regularizationFactor = 1 / double(sum);
 }
 //Get Ans
-void BPNN::updateLayers(double(*active)(const double&)) {
+void BPNN::updateLayers() {
 	int k, l;
 	for (int i = 1, j = 0; i < layers; i++, j++) {
 //#ifdef ShowAllNodes
@@ -133,7 +149,7 @@ void BPNN::updateLayers(double(*active)(const double&)) {
 		l = layerNodes[i];
 #ifndef LastLayerLinear
 		for (k = 0; k < l; k++) {
-			X[i](k) = active(X_Origin[i](k));
+			X[i](k) = activeFunction(X_Origin[i](k));
 		}
 #endif
 #ifdef LastLayerLinear
@@ -141,14 +157,14 @@ void BPNN::updateLayers(double(*active)(const double&)) {
 			X[i] = X_Origin[i];
 		}
 		else for (k = 0; k < l; k++) {
-			X[i](k) = active(X_Origin[i](k));
+			X[i](k) = activeFunction(X_Origin[i](k));
 		}
 #endif
 
 	}
 }
 //Update W and bias
-void BPNN::updateParameter(double(*activeD)(const double&)) {
+void BPNN::updateParameter() {
 	int i, j, k, l;
 	for (i = layers - 1, j = layers - 2; i > 0; i--, j--) {
 		l = layerNodes[i];
@@ -158,12 +174,12 @@ void BPNN::updateParameter(double(*activeD)(const double&)) {
 				Diff[i](k) = 1;
 			}
 			else {
-				Diff[i](k) = activeD(X_Origin[i](k));
+				Diff[i](k) = activeFunctionD(X_Origin[i](k));
 				
 			}
 #endif
 #ifndef LastLayerLinear
-			Diff[i](k) = activeD(X_Origin[i](k));
+			Diff[i](k) = activeFunctionD(X_Origin[i](k));
 #endif
 			diffBias[i](k) = fixY[i](k)*Diff[i](k);
 		}
@@ -184,7 +200,7 @@ void BPNN::updateParameter(double(*activeD)(const double&)) {
 	}
 }
 //input expect value(output node)
-void BPNN::setExpectData(double*Data, double(*active)(const double&)) {
+void BPNN::setExpectData(double*Data) {
 	VectorXd temp;
 	int last = layers - 1;
 	int size = layerNodes[last];
@@ -210,18 +226,19 @@ void BPNN::clearFix() {
 void BPNN::runGroup(double**group, double**flag, const int&groups,
 	double(*active)(const double&), double(*activeD)(const double&),
 	int writeFile) {
+	setActiveFunction(active, activeD);
 	if (writeFile) {
 		//清空偏移量
 		clearFix();
 		loss = 0;
 		for (int i = 0; i < groups; i++) {
-			setInputData(group[i], active);
+			setInputData(group[i]);
 			//后向传递
-			updateLayers(active);
-			setExpectData(flag[i], active);
+			updateLayers();
+			setExpectData(flag[i]);
 
 			//前向传递
-			if (writeFile > 0)updateParameter(activeD);
+			if (writeFile > 0)updateParameter();
 			int lastLayer = layers - 1;
 			for (int j = 0; j < layerNodes[lastLayer]; j++) {
 				loss += pow(fixY[lastLayer](j), 2);
@@ -270,8 +287,8 @@ void BPNN::runGroup(double**group, double**flag, const int&groups,
 		fout.open(outputFileName);
 
 		for (int i = 0; i < groups; i++) {
-			setInputData(group[i], active);
-			updateLayers(active);
+			setInputData(group[i]);
+			updateLayers();
 			for (int i = 0; i < layerNodes[layers - 1]; i++) {
 				//fout << max(int(X[layers - 1](i)),0) << endl;
 				fout << X[layers - 1](i) << endl;
@@ -331,6 +348,136 @@ void BPNN::setTestSet(double ** set, const int & count) {
 
 void BPNN::train(const int & times) {
 	//to do
+	//detection of validation set
+	if (validationCount > 0) {
+		validation = true;
+		cout << "Validation set detected.\n";
+	}
+	else{
+		validation = false;
+		cout << "No validation set detected, will use training set instead.\n";
+	}
+	loss = DBL_MAX;
+	for (int time = 0; time < times; time++) {
+		//清除偏移
+		clearFix();
+		loss_before = loss;
+		loss = 0;
+		for (int i = 0; i < trainingCount; i++) {
+			//backward
+			setInputData(trainingSet[i]);
+			updateLayers();
+			setExpectData(trainingFlag[i]);
+			//forward
+			updateParameter();
+			if (!validation) {
+				int lastLayer = layers - 1;
+				for (int j = 0; j < layerNodes[lastLayer]; j++) {
+					loss += pow(fixY[lastLayer](j), 2);
+				}
+			}
+		}
+		learn(trainingCount);
+		if (validation) {
+			for (int i = 0; i < validationCount; i++) {
+				setInputData(validationSet[i]);
+				updateLayers();
+				setExpectData(validationFlag[i]);
+				int lastLayer = layers - 1;
+				for (int j = 0; j < layerNodes[lastLayer]; j++) {
+					loss += pow(fixY[lastLayer](j), 2);
+				}
+			}
+			loss /= validationCount;
+		}
+		else loss /= trainingCount;
+
+		//提前终止
+		if (earlyStopping) {
+			if (loss < loss_before) {
+				worse_earlyStopping = 0;
+				loss_before = loss;
+				W_best = W;
+			}
+			else {
+				//cout << "Warning: worse_earlyStopping is counting. Loss:\t\t" << loss << endl;
+				worse_earlyStopping++;
+			}
+			if (worse_earlyStopping > patient_earlyStopping) {
+				cout << "EarlyStopping:worse to large " << worse_earlyStopping << endl;
+				cout << "Stopped at " << allCnt << " steps.\n";
+				//可以添加一个加载最优结果的函数
+				W = W_best;
+				cout << "W rollbacked.\n";
+				break;
+			}
+		}
+		allCnt++;
+		printCount++;
+		if (printCount == printMax) {
+			printCount = 0;
+			cout << allCnt << ":\t\t" << loss << endl;
+		}
+	}
+	cout << "Best loss:" << loss_before << endl;
+	if (testCount > 0) {
+		test = true;
+		cout << "Test set detected.\n";
+	}
+	else {
+		test = false;
+		cout << "No test set detected, use validation set or training set instead.\n";
+	}
+	outputFileName = "out/result_";
+	sst.str("");
+	sst.clear();
+	sst << clock();
+	sst >> sstOut;
+
+	sst.str("");
+	sst.clear();
+	sst << loss;
+	sst >> sstOut2;
+
+	outputFileName = outputFileName + sstOut + "_" + sstOut2 + ".csv";
+
+	ofstream fout;
+	fout.open(outputFileName);
+	if (test) {
+		for (int i = 0; i < testCount; i++) {
+			setInputData(testSet[i]);
+			updateLayers();
+			fout << X[layers - 1](0);
+			for (int i = 1; i < layerNodes[layers - 1]; i++) {
+				fout << '\t' << X[layers - 1](i) << endl;
+			}
+			fout << endl;
+		}
+	}
+	else if (validation) {
+		for (int i = 0; i < validationCount; i++) {
+			setInputData(validationSet[i]);
+			updateLayers();
+			fout << X[layers - 1](0);
+			for (int i = 1; i < layerNodes[layers - 1]; i++) {
+				fout << '\t' << X[layers - 1](i) << endl;
+			}
+			fout << endl;
+		}
+	}
+	else {
+		for (int i = 0; i < trainingCount; i++) {
+			setInputData(trainingSet[i]);
+			updateLayers();
+			fout << X[layers - 1](0);
+			for (int i = 1; i < layerNodes[layers - 1]; i++) {
+				fout << '\t' << X[layers - 1](i) << endl;
+			}
+			fout << endl;
+		}
+	}
+	fout.close();
+	cout << "Output\n";
 }
 
 void BPNN::printW() {

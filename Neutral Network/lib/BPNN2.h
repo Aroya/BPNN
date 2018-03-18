@@ -24,16 +24,10 @@ public:
 	BPNN(const int&CountOfLayers);
 	//set input array size
 	void setInputNodes(const int&Nodes);
-	//copy input data to first index of private data
-	void setInputData(double* NodeDataArray, double(*)(const double&));
+
 	//set layer array size(not contain input)
 	void setLayerNodes(int* Nodes);
-	//Get Ans
-	void updateLayers(double(*)(const double&) = defaultActive);
-	//Update W and bias
-	void updateParameter(double(*)(const double&) = defaultActiveD);
-	//input expect value(output node)
-	void setExpectData(double*Data, double(*)(const double&));
+
 	//run with group data
 	void runGroup(double**groupData, double**flag, const int&groups,
 		double(*)(const double&) = defaultActive, double(*)(const double&) = defaultActiveD,
@@ -55,9 +49,12 @@ public:
 	//正则化设置
 	void setRegularization(const Regularization&);
 	Regularization getRegularization();
+	//提前终止
+	void setEarlyStoppiing(const bool&,const int&);
 private:
 	//存储每一层的W矩阵
 	vector<MatrixXd> W;
+	vector<MatrixXd> W_best;
 	//存储每一层的计算结果
 	vector<VectorXd> X_Origin;
 	//存储每一层的输出结果
@@ -80,6 +77,15 @@ private:
 	int layers;
 	int *layerNodes;
 
+	//copy input data to first index of private data
+	void setInputData(double* NodeDataArray);
+	//Get Ans
+	void updateLayers();
+	//Update W and bias
+	void updateParameter();
+	//input expect value(output node)
+	void setExpectData(double*Data);
+
 	//激活函数指针
 	double (*activeFunction)(const double&);
 	double(*activeFunctionD)(const double&);
@@ -89,18 +95,28 @@ private:
 	double**trainingFlag;
 	int trainingCount;
 	//验证集
+	bool validation;
 	double**validationSet;
 	double**validationFlag;
 	int validationCount;
 	//测试集
+	bool test;
 	double**testSet;
 	int testCount;
 
 	//正则化设置
 	Regularization regularization;
 	double regularizationFactor;//由W的size决定
+	//正则化-提前终止
+	bool earlyStopping;
+
+	int patient_earlyStopping;
+	int worse_earlyStopping;
+	void setPatient_EarlyStopping(const int&);
+
 
 	double loss;
+	double loss_before;
 	double dynamic();
 	void learn(const int&groups);
 	void clearFix();
